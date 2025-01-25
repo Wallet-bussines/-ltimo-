@@ -1,4 +1,4 @@
-"use client";
+import React, { useState } from "react";
 import {
   MiniKit,
   tokenToDecimals,
@@ -6,14 +6,13 @@ import {
   PayCommandInput,
 } from "@worldcoin/minikit-js";
 
-const sendPayment = async () => {
+const sendPayment = async (amount: number, token: Tokens) => {
   try {
     const res = await fetch(`/api/initiate-payment`, {
       method: "POST",
     });
 
     const { id } = await res.json();
-
     console.log(id);
 
     const payload: PayCommandInput = {
@@ -21,16 +20,13 @@ const sendPayment = async () => {
       to: "0x512e4a7dda6b13f917d89fa782bdd7666dab1599", // Test address
       tokens: [
         {
-          symbol: Tokens.WLD,
-          token_amount: tokenToDecimals(0.5, Tokens.WLD).toString(),
-        },
-        {
-          symbol: Tokens.USDCE,
-          token_amount: tokenToDecimals(0.1, Tokens.USDCE).toString(),
+          symbol: token,
+          token_amount: tokenToDecimals(amount, token).toString(),
         },
       ],
       description: "Watch this is a test",
     };
+
     if (MiniKit.isInstalled()) {
       return await MiniKit.commandsAsync.pay(payload);
     }
@@ -41,12 +37,12 @@ const sendPayment = async () => {
   }
 };
 
-const handlePay = async () => {
+const handlePay = async (amount: number, token: Tokens) => {
   if (!MiniKit.isInstalled()) {
     console.error("MiniKit is not installed");
     return;
   }
-  const sendPaymentResponse = await sendPayment();
+  const sendPaymentResponse = await sendPayment(amount, token);
   const response = sendPaymentResponse?.finalPayload;
   if (!response) {
     return;
@@ -60,19 +56,48 @@ const handlePay = async () => {
     });
     const payment = await res.json();
     if (payment.success) {
-      // Congrats your payment was successful!
       console.log("SUCCESS!");
     } else {
-      // Payment failed
       console.log("FAILED!");
     }
   }
 };
 
 export const PayBlock = () => {
+  const [amount, setAmount] = useState(0.0);
+  const [token, setToken] = useState<Tokens>(Tokens.WLD);
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAmount(parseFloat(e.target.value));
+  };
+
+  const handleTokenChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setToken(e.target.value === "USDC" ? Tokens.USDCE : Tokens.WLD);
+  };
+
   return (
-    <button className="bg-blue-500 p-4" onClick={handlePay}>
-      Pay
-    </button>
+    <div>
+      <input
+        type="number"
+        value={amount}
+        onChange={handleAmountChange}
+        placeholder="Enter amount"
+        className="mb-2 p-2 border"
+      />
+      <select
+        value={token === Tokens.USDCE ? "USDC" : "WLD"}
+        onChange={handleTokenChange}
+        className="mb-2 p-2 border"
+      >
+        <option value="WLD">WLD</option>
+        <option value="USDC">USDC</option>
+      </select>
+      <button
+        className="bg-blue-500 p-4"
+        onClick={() => handlePay(amount, token)}
+      >
+        Pay
+      </button>
+    </div>
   );
 };
