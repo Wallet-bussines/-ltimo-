@@ -16,7 +16,7 @@ export type VerifyCommandInput = {
 
 const verifyPayload: VerifyCommandInput = {
   action: "test-action", // This is your action ID from the Developer Portal
-  signal: "",
+  signal: "https://twdnrdzqthbdikjy.vercel.app/",
   verification_level: VerificationLevel.Orb, // Orb | Device
 };
 
