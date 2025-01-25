@@ -2,8 +2,37 @@
 
 import type React from "react"
 import { useState } from "react"
-import { MiniKit, tokenToDecimals, Tokens, type PayCommandInput } from "@worldcoin/minikit-js"
 import { motion } from "framer-motion"
+import { MiniKit, tokenToDecimals, Tokens, type PayCommandInput } from "@worldcoin/minikit-js"
+import DEXABI from "../../abi/DEX.json"
+
+type SendTransactionInput = {
+  transaction: Transaction[]
+  permit2?: Permit2[]
+}
+
+type Permit2 = {
+  permitted: {
+    token: string
+    amount: string | unknown
+  }
+  spender: string
+  nonce: string | unknown
+  deadline: string | unknown
+}
+
+type Transaction = {
+  address: string
+  abi: any[]
+  functionName: string
+  args: any[]
+}
+
+const testTokens = {
+  worldchain: {
+    USDCE: "0x1234567890123456789012345678901234567890", // Replace with actual address
+  },
+}
 
 const sendPayment = async (amount: number, token: Tokens) => {
   try {
@@ -36,18 +65,74 @@ const sendPayment = async (amount: number, token: Tokens) => {
   }
 }
 
+const sendTransaction = async () => {
+  if (!MiniKit.isInstalled()) {
+    return
+  }
+
+  const deadline = Math.floor((Date.now() + 30 * 60 * 1000) / 1000).toString()
+
+  const permitTransfer = {
+    permitted: {
+      token: testTokens.worldchain.USDCE,
+      amount: "10000",
+    },
+    nonce: Date.now().toString(),
+    deadline,
+  }
+
+  const permitTransferArgsForm = [
+    [permitTransfer.permitted.token, permitTransfer.permitted.amount],
+    permitTransfer.nonce,
+    permitTransfer.deadline,
+  ]
+
+  const transferDetails = {
+    to: "0x126f7998Eb44Dd2d097A8AB2eBcb28dEA1646AC8",
+    requestedAmount: "10000",
+  }
+
+  const transferDetailsArgsForm = [transferDetails.to, transferDetails.requestedAmount]
+
+  const { commandPayload, finalPayload } = await MiniKit.commandsAsync.sendTransaction({
+    transaction: [
+      {
+        address: "0x34afd47fbdcc37344d1eb6a2ed53b253d4392a2f",
+        abi: DEXABI,
+        functionName: "signatureTransfer",
+        args: [permitTransferArgsForm, transferDetailsArgsForm, "PERMIT2_SIGNATURE_PLACEHOLDER_0"],
+      },
+    ],
+    permit2: [
+      {
+        ...permitTransfer,
+        spender: "0x34afd47fbdcc37344d1eb6a2ed53b253d4392a2f",
+      },
+    ],
+  })
+
+  return finalPayload
+}
+
 const handlePay = async (amount: number, token: Tokens) => {
   if (!MiniKit.isInstalled()) {
     console.error("MiniKit is not installed")
     return
   }
-  const sendPaymentResponse = await sendPayment(amount, token)
-  const response = sendPaymentResponse?.finalPayload
+
+  let response
+  if (token === Tokens.USDCE) {
+    response = await sendTransaction()
+  } else {
+    const sendPaymentResponse = await sendPayment(amount, token)
+    response = sendPaymentResponse?.finalPayload
+  }
+
   if (!response) {
     return
   }
 
-  if (response.status == "success") {
+  if (response.status === "success") {
     const res = await fetch(`${process.env.NEXTAUTH_URL}/api/confirm-payment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -71,7 +156,7 @@ export const PayBlock = () => {
   }
 
   const handleTokenChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setToken(e.target.value === "USDC" ? Tokens.USDCE : Tokens.WLD)
+    setToken(e.target.value as Tokens)
   }
 
   return (
@@ -102,12 +187,12 @@ export const PayBlock = () => {
           </label>
           <select
             id="token"
-            value={token === Tokens.USDCE ? "USDC" : "WLD"}
+            value={token}
             onChange={handleTokenChange}
             className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="WLD">WLD</option>
-            <option value="USDC">USDC</option>
+            <option value={Tokens.WLD}>WLD</option>
+            <option value={Tokens.USDCE}>USDC</option>
           </select>
         </div>
         <motion.button
@@ -121,4 +206,4 @@ export const PayBlock = () => {
       </div>
     </motion.div>
   )
-}
+                            }
